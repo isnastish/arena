@@ -1,0 +1,20 @@
+// TODO:
+//
+// [x] Entry point/types (Window)
+// [x] Pointer arithmetic. Allocate some memory, do some computation on that memory using pointers.
+// [x] Explain K&R's memory allocator, so people can have a basic understanding of how it works. 
+//    [x] Inspect what happens if I try to allocate ALLOC_SIZE bytes.
+//	[x] Introduce the alignment.
+// [x]  Implement real-world Arena using VirtualAlloc.
+//     [x] Introduce dummy Os abstaraction struct which will have pointers to Os's memory allocation procedures.
+//     [x] Implement function to get memory from the OS.
+// 	[x] struct Arena{};
+//     [x] Helper macros.  
+//     [x] Procedures to work with arena.
+// 	[x] Temporary arena struct.
+//     [x] Procedures to work with temporary arena.
+//     [x] Test temporary arenas.
+// [x] Test arena. Crash it. Recreate it etc. (Crash is not gonna happen today, you have to investigate on your own).
+//	[x] Use Arena to read the contents of the file.
+//        static FileReadResult read_entire_file_into_memory(Arena *arena, U8 file_name);
+
