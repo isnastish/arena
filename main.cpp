@@ -1,3 +1,25 @@
+// TODO(oleksii): 
+//
+// [x] Explain the problem to people
+// [x] Implement type-specific doubly linked list first.
+//     [x] push_front (push a node to the front of the list)
+//     [x] push_back (push a node to the back of the list)
+//     [x] pop_front (pop from the front, if exists)
+//     [x] pop_back (pop from the back, if exists)
+//     [x] pop_node (remove an a node from the list)
+//     [x] front (get first element in the list)
+//     [x] back (get last element in the list)
+//     [x] Implement Queue based on DLL(doubly linked list)
+//     [x] Implement Stack based on DLL
+// [x] Implement type-independent doubly linked list/queue/stack
+// [x] Test those things
+// [x] Should the implementaion of DLL allocate memory, or an arena itself.
+
+// NOTE(oleksii): Think about it more!
+// list_front() can be called before list_pop_front() to receive the element which is about to be poped
+// list_back() can be called before list_pop_back() to receive the element which is about to be poped
+
+
 ////////////////////////////////
 // NOTE(oleksii): C-library headers. Type aliases.
 #include <stdio.h>
@@ -20,6 +42,9 @@ else{\
 *(I32 *)0 = 0x1;\
 }
 
+#define global static
+#define function static
+#define local_persist static
 
 #define MemDefaultReserveSize 4*(1ull << 30) // 4GB
 #define MemDefaultCommitSize (1ull << 20) // 1MB
@@ -118,10 +143,7 @@ static void afree(U8 *ptr){
 
 #include "arena.cpp"
 
-
-////////////////////////////////
-// NOTE(oleksii): Entry point
-INT WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, int show_code){
+/*
 #if 0
     {
         I32 count = (1 << 10); // 1KB
@@ -312,6 +334,403 @@ INT WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, i
             DEBUG_Assert(ptr_before_tmp_arena == arena.alloc_ptr);
         }
     }
+    */
+
+struct List{
+    List *next;
+    List *prev;
+    
+    // data
+    struct{
+        I32 i32;
+    };
+};
+
+struct AnotherList{
+    AnotherList *next;
+    AnotherList *prev;
+    
+    // data
+    struct{
+        I32 i32;
+        F32 f32;
+        struct{
+            U8 name[1 << 10];
+            U32 used;
+        };
+    };
+};
+
+function List *list_front(List *sentinel){
+    return(sentinel->next);
+}
+
+function List *list_back(List *sentinel){
+    return(sentinel->prev);
+}
+
+function void list_push_front(List *sentinel, List *node){
+    if(!sentinel->next && !sentinel->prev){
+        node->next = sentinel;
+        node->prev = sentinel;
+        sentinel->next = sentinel->prev = node;
+    }
+    else{
+        node->next = sentinel->next;
+        node->prev = sentinel;
+        sentinel->next->prev = node;
+        sentinel->next = node;
+    }
+}
+
+function void list_push_back(List *sentinel, List *node){
+    if(!sentinel->next && !sentinel->prev){
+        node->next = sentinel;
+        node->prev = sentinel;
+        sentinel->next = sentinel->prev = node;
+    }
+    else{
+        node->next = sentinel;
+        node->prev = sentinel->prev;
+        sentinel->prev->next = node;
+        sentinel->prev = node;
+    }
+}
+
+function void list_pop_front(List *sentinel){
+    if(sentinel->next && sentinel->prev){
+        List *snn = sentinel->next->next;
+        snn->prev = sentinel;
+        sentinel->next = snn;
+    }
+}
+
+function void list_pop_back(List *sentinel){
+    if(sentinel->next && sentinel->prev){
+        List *spp = sentinel->prev->prev;
+        spp->next = sentinel;
+        sentinel->prev = spp;
+    }
+}
+
+function void list_pop_node(List *sentinel, List *node){
+    if(sentinel->next && sentinel->prev){
+        node->next->prev = node->prev;
+        node->prev->next = node->next;
+    }
+}
+
+// First in first out
+function void queue_push(List *sentinel, List *node){
+    // If we are pushing to the front of the list, we have to pop from the back of the list
+    // If we are pushing to the end of the list, we have to pop from the front of the list.
+    list_push_front(sentinel, node);
+}
+
+function void queue_pop(List *sentinel){
+    // If we are pushing to the front of the list, we have to pop from the back of the list
+    // If we are pushing to the end of the list, we have to pop from the front of the list.
+    list_pop_back(sentinel);
+}
+
+// First in last out
+function void stack_push(List *sentinel, List *node){
+    // if we are pushing to the front of the list, we have to pop from the front as well, 
+    // If we are pushing to the end of the list, we have pop from there as well.
+    list_push_front(sentinel, node);
+}
+
+function void stack_pop(List *sentinel){
+    // if we are pushing to the front of the list, we have to pop from the front as well, 
+    // If we are pushing to the end of the list, we have pop from there as well.
+    list_pop_front(sentinel);
+}
+
+function List *list_init(Arena *arena){
+    List *sentinel = ArenaPushStruct(arena, List);
+    sentinel->next = sentinel;
+    sentinel->prev = sentinel;
+    return(sentinel);
+}
+
+////////////////////////////////
+// NOTE(oleksii): Type-independent list/queue/stack
+// TODO(oleksii): Try to play arond with it, maybe use arena, and allocate memory directly here for the sentinel
+// List *sentinel = ArenaPushStruct(&arena, List);
+// DLLInit(sentinel);
+#define DLLInit(sentinel)\
+(sentinel)->next = (sentinel);\
+(sentinel)->prev = (sentinel);
+
+#define DLLFront(sentinel) ((sentinel)->next)
+#define DLLBack(sentinel) ((sentinel)->prev)
+
+// NOTE(oleksii): Assuming that the sentinel was initialized with DLLInit macro
+#define DLLPushFront(sentinel, node)\
+(node)->next = (sentinel)->next;\
+(node)->prev = (sentinel);\
+(sentinel)->next->prev = (node);\
+(sentinel)->next = (node);
+
+// NOTE(oleksii): Assuming that the sentinel was initialized with DLLInit macro
+#define DLLPushBack(sentinel, node)\
+(node)->next = (sentinel);\
+(node)->prev = (sentinel)->prev;\
+(sentinel)->prev->next = (node);\
+(sentinel)->prev = (node);
+
+#define DLLPopFront(sentinel)\
+(sentinel)->next->next->prev = (sentinel);\
+(sentinel)->next = (sentinel)->next->next;
+
+#define DLLPopBack(sentinel)\
+(sentinel)->prev->prev->next = (sentinel);\
+(sentinel)->prev = (sentinel)->prev->prev;
+
+// NOTE(oleksii): You have to make sure that node is a valid pointer to one of the elements in the DLL
+#define DLLPopNode(sentinel, node)\
+(node)->next->prev = (node)->prev;\
+(node)->prev->next = (node)->next;
+
+
+// Queue (First in first out)
+#define QueuePush(sentinel, node) DLLPushFront(sentinel, node);
+#define QueuePop(sentinel) DLLPopBack(sentinel); 
+
+// Stack (First in last out)
+#define StackPush(sentinel, node) DLLPushFront(sentinel, node);
+#define StackPop(sentinel) DLLPopFront(sentinel);
+
+INT WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, int show_code){
+    Os os = {};
+    os.reserve_memory = w32_reserve_memory;
+    os.commit_memory  = w32_commit_memory;
+    os.decommit_memory = w32_decommit_memory;
+    os.release_memory  = w32_release_memory;
+    os_ptr = &os;
+    
+    Arena arena = make_arena(8u);
+    TempArena temp_arena = temp_arena_start(&arena);
+    {
+        List *sentinel = ArenaPushStruct(&arena, List);
+        /*
+        sentinel->next = sentinel;
+        sentinel->prev = sentinel;
+        */
+        
+#define IterateList(sentinel) \
+{\
+for(List *node = (sentinel)->next;\
+node != (sentinel); \
+node = node->next){\
+DEBUG_Outf("node->i32: %i\n", node->i32); \
+}\
+}
+        
+        U32 count = 4;
+        for(U32 i = 0; i < count; i += 1){
+            // NOTE(oleksii): Allocate the memory for the node outside the implementation of the List
+            List *node = ArenaPushStruct(&arena, List);
+            node->i32 = i;
+            list_push_front(sentinel, node);
+        }
+        for(U32 i = 0; i < count; i += 1){
+            List *node = ArenaPushStruct(&arena, List);
+            node->i32 = i + 4;
+            list_push_back(sentinel, node);
+        }
+        IterateList(sentinel);
+        
+        // NOTE(oleksii): Pop from the beginning of the list
+        list_pop_front(sentinel);
+        list_pop_front(sentinel);
+        list_pop_front(sentinel);
+        DEBUG_Out("\n\n");
+        IterateList(sentinel);
+        
+        // NOTE(oleksii): Pop form the end of the list
+        list_pop_back(sentinel);
+        list_pop_back(sentinel);
+        list_pop_back(sentinel);
+        DEBUG_Out("\n\n");
+        IterateList(sentinel);
+        
+        for(U32 i = 0; i < count; i += 1){
+            List *node = ArenaPushStruct(&arena, List);
+            node->i32 = i + 8;
+            list_push_back(sentinel, node);
+        }
+        DEBUG_Out("\n\n");
+        IterateList(sentinel);
+        
+        List *spp = sentinel->prev->prev;
+        list_pop_node(sentinel, spp);
+        
+        DEBUG_Out("\n\n");
+        IterateList(sentinel);
+        DEBUG_Out("\n\n");
+        
+        ////////////////////////////////
+        // NOTE(oleksii): Testing the queue
+        {
+            List *queue = list_init(&arena);
+            U32 count = 4;
+            for(U32 i = 0; i < count; i += 1){
+                List *node = ArenaPushStruct(&arena, List);
+                node->i32 = i;
+                queue_push(queue, node);
+            }
+            //IterateList(queue);
+            queue_pop(queue);
+            queue_pop(queue);
+            IterateList(queue);
+            
+            {
+                List *node = ArenaPushStruct(&arena, List);
+                node->i32 = 12;
+                queue_push(queue, node);
+                
+                node = ArenaPushStruct(&arena, List);
+                node->i32 = 13;
+                queue_push(queue, node);
+            }
+            DEBUG_Out("\n\n");
+            IterateList(queue);
+            DEBUG_Out("\n\n");
+        }
+        
+        ////////////////////////////////
+        // NOTE(oleksii): Testing the stack
+        {
+            List *stack = list_init(&arena);
+            U32 count = 4;
+            for(U32 i = 0; i < count; i += 1){
+                List *node = ArenaPushStruct(&arena, List);
+                node->i32 = i*10;
+                stack_push(stack, node);
+            }
+            IterateList(stack);
+            DEBUG_Out("\n\nBefore pop:\n");
+            stack_pop(stack);
+            stack_pop(stack);
+            DEBUG_Out("After pop:\n");
+            IterateList(stack);
+            
+            {
+                List *node = ArenaPushStruct(&arena, List);
+                node->i32 = 40;
+                stack_push(stack, node);
+                
+                node = ArenaPushStruct(&arena, List);
+                node->i32 = 50;
+                stack_push(stack, node);
+            }
+            DEBUG_Out("\n\n");
+            IterateList(stack);
+            DEBUG_Out("\n\n");
+        }
+#undef IterateList
+        
+        ////////////////////////////////
+        // NOTE(oleksii): Testing using macros
+        {
+            struct SomeStruct{ // test structure
+                SomeStruct *next;
+                SomeStruct *prev;
+                
+                struct{
+                    I32 data;
+                };
+            };
+#define Iterate(s)\
+for(SomeStruct *node = (s)->next;\
+node != (s);\
+node = node->next){\
+DEBUG_Outf("node->data: %i\n", node->data);\
+}
+            SomeStruct *list = ArenaPushStruct(&arena, SomeStruct);
+            DLLInit(list); // list->next=list->prev=list
+            for(I32 i = 0; i < 8; i += 1){
+                SomeStruct *node = ArenaPushStruct(&arena, SomeStruct);
+                node->data = i;
+                DLLPushFront(list, node);
+            }
+            Iterate(list);
+            DEBUG_Outf("\n\n");
+            DLLPopFront(list);
+            DLLPopFront(list);
+            DLLPopBack(list);
+            DLLPopFront(list);
+            DLLPopBack(list);
+            Iterate(list);
+            DEBUG_Outf("\n\n");
+            
+            SomeStruct *queue = ArenaPushStruct(&arena, SomeStruct);
+            DLLInit(queue);
+            for(U32 j = 0; j < 8; j += 1){
+                SomeStruct *node = ArenaPushStruct(&arena, SomeStruct);
+                node->data = j*10;
+                QueuePush(queue, node);
+            }
+            Iterate(queue);
+            DEBUG_Outf("\n\n");
+            
+            // let's pop and push elements from the queue
+            QueuePop(queue);
+            QueuePop(queue);
+            QueuePop(queue);
+            QueuePop(queue);
+            QueuePop(queue);
+            Iterate(queue);
+            DEBUG_Outf("\n\n");
+            
+            for(U32 j = 0; j < 4; j += 1){
+                SomeStruct *node = ArenaPushStruct(&arena, SomeStruct);
+                node->data = (j+8)*10;
+                QueuePush(queue, node);
+            }
+            Iterate(queue);
+            DEBUG_Outf("\n\n");
+            
+            QueuePop(queue);
+            QueuePop(queue);
+            QueuePop(queue);
+            QueuePop(queue);
+            Iterate(queue);
+            DEBUG_Outf("\n\n");
+            
+            SomeStruct *stack = ArenaPushStruct(&arena, SomeStruct);
+            DLLInit(stack); // stack->next=stack->prev=stack
+            for(U32 k = 0; k < 16; k += 1){
+                SomeStruct *node = ArenaPushStruct(&arena, SomeStruct);
+                node->data = k;
+                StackPush(stack, node);
+            }
+            Iterate(stack);
+            DEBUG_Outf("\n\n");
+            
+            StackPop(stack);
+            StackPop(stack);
+            StackPop(stack);
+            {
+                SomeStruct *node = ArenaPushStruct(&arena, SomeStruct);
+                node->data = 16;
+                StackPush(stack, node);
+            }
+            StackPop(stack);
+            StackPop(stack);
+            {
+                SomeStruct *node = ArenaPushStruct(&arena, SomeStruct);
+                node->data = 17;
+                StackPush(stack, node);
+            }
+            Iterate(stack);
+            
+#undef Iterate
+        }
+    }
+    // TODO(oleksii): Debug! Maybe we want to clear all the memory that we've used so far
+    temp_arena_end(temp_arena);
     
     return(0);
 }
